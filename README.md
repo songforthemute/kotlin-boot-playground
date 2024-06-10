@@ -79,9 +79,8 @@ tasks.withType<Test> {
 
 ## Explore the generated Spring Boot application
 
-### `DemoApplication.kt`
-
 ```kotlin
+// DemoApplication.kt
 package com.example.demo
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
@@ -136,10 +135,9 @@ class MessageController {
 ```
 
 - Spring 애플리케이션에서 컨트롤러는 웹 요청을 처리하는 데 사용
-    -
-    _cf. [Unresolved reference 오류](https://medium.com/@songforthemute/unresolved-reference-web-6fd6ca60139c)_
 - **`@RestController` 어노테이션**
-    - Spring에게 `MessageController`가 REST 컨트롤러임을 알리는 역할
+    - Spring에게 `MessageController`가 REST 컨트롤러임을 알리는 역할,
+      _cf. [Unresolved reference](https://medium.com/@songforthemute/unresolved-reference-web-6fd6ca60139c)_
     - 이 어노테이션은 이 클래스가 `DemoApplication` 클래스와 동일한 패키지에 있기 때문에 컴포넌트 스캔에서 선택된다는 것을 의미
 - **`@GetMapping` 어노테이션**
     - HTTP GET 호출에 해당하는 엔드포인트를 구현하는 REST 컨트롤러의 함수 표시
