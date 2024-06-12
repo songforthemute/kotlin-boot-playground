@@ -11,7 +11,9 @@
     - [Create a controller](#create-a-controller)
     - [Run the application](#run-the-application)
 2. Add a data class to the Spring Boot project
+    - [Update your application](#update-your-application)
 3. Add database support for the Spring Boot project
+    - [Add database support](#add-database-support)
 4. Use Spring Data CrudRepository for the database access
 
 ---
@@ -153,3 +155,75 @@ class MessageController {
 1. `main()` 함수를 실행하면, 로컬 서버가 컴퓨터에서 실행
     - 또는 터미널에서 `./gradlew bootRun` 커맨드를 실행해도 가능
 2. `http://localhost:8080?name=Jenny`
+
+---
+
+## Update your application
+
+```kotlin
+// DemoApplication.kt
+data class Message(val id: String?, val text: String)
+
+@RestContrller
+class MessageController {
+    @GetMapping("/")
+    fun index() = listOf(
+        Message("1", "Hello!"),
+        Message("2", "Bonjour!"),
+        Message("3", "Privet!"),
+    )
+}
+```
+
+- `Message` 클래스는 데이터 전송에 사용
+    - 직렬화된 `Message` 객체들은 컨트롤러가 브라우저 요청에 응답할 JSON 문서를 구성
+- **Data classes - `data class Message`**
+    - Kotlin에서 `data class`의 주 목적은 데이터를 보유하는 것
+    - 이런 클래스는 `data` 키워드로 표시되며, 일부 표준 기능과 일부 유틸리티 함수는 클래스 구조에서 기계적으로 파생 가능한 경우가 많음
+- Spring 애플리케이션의 모든 컨트롤러는 `Jackson` 라이브러리가 클래스 경로에 있는 경우, 기본적으로 JSON 응답을 렌더링
+    - `build.gradle.kts` 파일에서 `spring-boot-starter-web` 종속성을 지정하면 전이적 종속성으로 `Jackson`을 받음
+    - 따라서 엔드포인트가 JSON으로 직렬화할 수 있는 데이터 구조를 반환하면 애플리케이션은 JSON 문서로 응답
+- `Unresolved reference: data`
+    - `build.gradle.kts` 파일의 의존성에 다음의 패키지 추가
+    - `implementation("org.springframework.boot:spring-boot-starter-data-jpa")` 추가
+
+### Run the application
+
+- `http://localhost:8080`
+
+```kotlin
+/**
+Description:
+Failed to configure a DataSource: 'url' attribute is not specified and no embedded datasource could be configured.
+
+Reason: Failed to determine a suitable driver class
+
+
+Action:
+
+Consider the following:
+If you want an embedded database (H2, HSQL or Derby), please put it on the classpath.
+If you have database settings to be loaded from a particular profile you may need to activate it (no profiles are currently active).
+ */
+```
+
+- Spring Boot가 데이터 소스를 자동 구성하려 시도했으나 필요한 구성을 찾지 못해 발생한 에러
+- 데이터 소스가 필요하지 않은 경우, 다음과 같이 자동 구성을 사용하지 않도록 설정 가능
+
+```kotlin
+import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+
+@SpringBootApplication(exclude = [DataSourceAutoConfiguration::class])
+class DemoApplication
+```
+
+---
+
+## Add database support
+
+-
+
+```kotlin
+
+```
