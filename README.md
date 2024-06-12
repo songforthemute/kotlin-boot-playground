@@ -14,6 +14,9 @@
     - [Update your application](#update-your-application)
 3. Add database support for the Spring Boot project
     - [Add database support](#add-database-support)
+    - [Update the MessageController class](#update-the-messagecontroller-class)
+    - [Update the MessageService class](#update-the-messageservice-class)
+    - [Configure the database](#configure-the-database)
 4. Use Spring Data CrudRepository for the database access
 
 ---
@@ -222,8 +225,93 @@ class DemoApplication
 
 ## Add database support
 
--
+- Spring 프레임워크 기반 애플리케이션의 일반적인 관행은 소위 서비스 계층(비즈니스 로직이 있는 곳)에서 데이터베이스 액세스 로직을 구현하는 것
+- Spring에서는 클래스가 애플리케이션의 서비스 계층에 속한다는 것을 암시하기 위해 `@Service` 어노테이션으로 클래스 표시
 
 ```kotlin
+import org.springframework.stereotype.Service
+import org.springframework.jdbc.core.JdbcTemplate
 
+@Service
+class MessageService(val db: JdbcTemplate) {
+    fun findMessages(): List<Message> = db.query("select * from messages") { response, _ ->
+        Message(response.getString("id"), response.getString("text"))
+    }
+
+    fun save(message: Message) {
+        db.update(
+            "insert into messages values ( ?, ? )",
+            message.id, message.text
+        )
+    }
+}
 ```
+
+- **Constructor argument and dependency inject - `(val db: JdbcTemplate)`**
+    - Kotlin의 클래스에는 기본 생성자가 존재하며, 기본 생성자는 클래스 헤더의 일부
+    - 또한, 하나 이상의 보조 생성자를 가질 수 있음
+- **Trailing lambda and SAM conversion**
+    - `db.query("...", RowMapper { ... })`
+        - `findMessages()` 함수는 `JdbcTemplate` 클래스의 `query()` 함수 호출
+        - `query()` 함수는 두 개의 인수를 받는데, 하나는 문자열 인스턴스로서의 SQL 쿼리, 다른 하나는 row당 하나의 객체를 매핑하는 콜백
+    - `db.query("...", { ... })`
+        - `RowMapper` 인터페이스는 메서드를 하나만 선언하므로, 인터페이스 이름을 생략해 람다 표현식을 통해 구현 가능
+        - 람다 식을 함수 호출의 매개변수로 사용하기 때문에 Kotlin 컴파일러는 람다 식을 변환해야 하는 인터페이스를 인지하고 있음
+        - 이를 Kotlin에서는 'SAM conversion'이라고 부름
+    - `db.query("...") { ... }`
+        - SAM conversion 후 query 함수는 첫 번째 위치에 문자열이, 마지막 위치에 람다 표현식이 있는 두 개의 인수를 갖게 됨
+        - Kotlin 규칙에 따르면 함수의 마지막 매개변수가 함수인 경우, 해당 인수로 전달된 람다 표현식을 괄호 밖에 배치할 수 있음(Trailing lambda, 후행
+          람다)
+- **Underscore for unused lambda argument**
+    - 여러 개의 매개변수가 있는 람다의 경우, 언더스코어 문자를 사용해 사용하지 않는 매개변수의 이름 변경 가능
+
+## Update the MessageController class
+
+```kotlin
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.PostMapping
+
+@RestController
+class MesasgeController(val service: MessageService) {
+    @GetMapping("/")
+    fun index(): List<Message> = service.findMessages()
+
+    @PostMapping("/")
+    fun post(@RequestBody message: Message) {
+        service.save(message)
+    }
+}
+```
+
+- **`@PostMapping` 어노테이션**
+    - HTTP POST 요청을 처리하는 메서드에 추가하는 어노테이션
+- **`@RequestBody` 어노테이션**
+    - HTTP Body의 콘텐츠로 전송되 JSON을 객체로 변환하기 위해 사용하는 어노테이션
+    - 애플리케이션의 classpath에 존재하는 `Jackson` 라이브러리로 인해 자동으로 변환이 이루어짐
+
+## Update the MessageService class
+
+```kotlin
+import java.util.UUID
+
+@Service
+class MessageService(val db: JdbcTemplate) {
+    fun findMessages(): List<Message> = db.query("select * from messages") { response, _ ->
+        Message(response.getString("id"), response.getString("text"))
+    }
+
+    fun save(message: Message) {
+        val id = message.id ?: UUID.randomUUID().toString()
+        db.update(
+            "insert into messages values ( ?, ? )",
+            id, message.text
+        )
+    }
+}
+```
+
+- `Message` 클래스의 `id`가 nullable 문자열로 선언됨
+    - 하지만 데이터베이스에 `null`값을 `id`값으로 저장하는 것은 올바르지 않으므로 이 상황을 처리할 필요가 있음
+- 이로써 애플리케이션 코드가 데이터베이스와 함께 작동할 준비가 완료되었으므로 데이터 소스를 구성해야 함
+
+## Configure the database
