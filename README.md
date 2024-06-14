@@ -17,6 +17,8 @@
     - [Update the MessageController class](#update-the-messagecontroller-class)
     - [Update the MessageService class](#update-the-messageservice-class)
     - [Configure the database](#configure-the-database)
+    - [Add messages to database via HTTP request](#add-messages-to-database-via-http-request)
+    - [Retrieve messages by id](#retrieve-messages-by-id)
 4. Use Spring Data CrudRepository for the database access
 
 ---
@@ -315,3 +317,72 @@ class MessageService(val db: JdbcTemplate) {
 - 이로써 애플리케이션 코드가 데이터베이스와 함께 작동할 준비가 완료되었으므로 데이터 소스를 구성해야 함
 
 ## Configure the database
+
+1. `src/main/resources` 디렉토리에 `schema.sql` 파일 생성
+    - 데이터베이스 객체 정의가 저장되는 곳
+2. `src/main/resources/schema.sql` 파일 작성
+    ```roomsql
+    CREATE TABLE IF NOT EXISTS message (
+        id  VARCHAR(60) PRIMARY KEY,
+        text    VARCHAR NOT NULL
+    );
+    ```
+    - `id`, `text` 두 개의 열로 `messages` 테이블 생성(`Message` 클래스 구조와 일치)
+3. `src/main/resources` 폴더의 `application.properties` 파일에 애플리케이션 속성 추가
+    ```properties
+    spring.datasource.driver-class-name=org.h2.Driver
+    spring.datasource.url=jdbc:h2:file:./data/testdb
+    spring.datasource.username=name
+    spring.datasource.password=password
+    spring.sql.init.schema-locations=classpath:schema.sql
+    spring.sql.init.mode=always
+    ```
+    - 이 설정은 Spring Boot 애플리케이션의 데이터베이스를 활성화
+
+## Add messages to database via HTTP request
+
+- 이전에 생성한 엔드포인트로 작업하기 위해서는 HTTP 클라이언트를 사용해야 함
+- IntelliJ IDEA에서는 임베디드 HTTP 클라이언트 사용
+
+1. 애플리케이션을 실행하면, POST 요청을 실행하여 데이터베이스에 메시지를 저장할 수 있음. `src/main/resources` 폴더에 `requests.http` 파일을
+   생성하고 다음 HTTP 요청 추가
+    ```http
+    ### POST "Hello!"
+    POST http://localhost:8080/
+    Content-Type: application/json
+    
+    {
+        "text": "Hello!"
+    }
+    
+    ### Post "Bonjour!"
+    POST http://localhost:8080/
+    Content-Type: application/json
+    
+    {
+        "text": "Bonjour!"
+    }
+   
+    ### POST "Privet!"
+    POST http://localhost:8080/
+    Content-Type: application/json
+    
+    {
+        "text": "Privet!"
+    }
+   
+    ### Get all the messages
+    GET http://localhost:8080/
+    ```
+
+2. 모든 POST 요청을 실행하면 텍스트 메세지를 데이터베이스에 기록
+
+- _cf. 다른 방법으로 requests를 실행하는 방법_
+    ```shell
+    curl -X POST --location "http;//localhost:8080" -H "Content-Type: application/json" -d "{ \"text\": \"Hello!\" }"
+    curl -X POST --location "http;//localhost:8080" -H "Content-Type: application/json" -d "{ \"text\": \"Bonjour!\" }"
+    curl -X POST --location "http;//localhost:8080" -H "Content-Type: application/json" -d "{ \"text\": \"Privet!\" }"
+    curl -X GET --location "http;//localhost:8080"
+    ```
+
+## Retrieve messages by id
