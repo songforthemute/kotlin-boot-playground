@@ -20,6 +20,7 @@
     - [Add messages to database via HTTP request](#add-messages-to-database-via-http-request)
     - [Retrieve messages by id](#retrieve-messages-by-id)
 4. Use Spring Data CrudRepository for the database access
+    - [Update your application](#update-your-application-1)
 
 ---
 
@@ -373,16 +374,160 @@ class MessageService(val db: JdbcTemplate) {
    
     ### Get all the messages
     GET http://localhost:8080/
-    ```
+    ```[testdb.mv.db](data%2Ftestdb.mv.db)
 
 2. 모든 POST 요청을 실행하면 텍스트 메세지를 데이터베이스에 기록
 
 - _cf. 다른 방법으로 requests를 실행하는 방법_
     ```shell
-    curl -X POST --location "http;//localhost:8080" -H "Content-Type: application/json" -d "{ \"text\": \"Hello!\" }"
-    curl -X POST --location "http;//localhost:8080" -H "Content-Type: application/json" -d "{ \"text\": \"Bonjour!\" }"
-    curl -X POST --location "http;//localhost:8080" -H "Content-Type: application/json" -d "{ \"text\": \"Privet!\" }"
-    curl -X GET --location "http;//localhost:8080"
+    curl -X POST --location "http://localhost:8080" -H "Content-Type: application/json" -d "{ \"text\" : \"Hello\" }"
+    curl -X POST --location "http://localhost:8080" -H "Content-Type: application/json" -d "{ \"text\" : \"Bonjour\" }"
+    curl -X POST --location "http://localhost:8080" -H "Content-Type: application/json" -d "{ \"text\" : \"Privet\" }"
+    curl -X POST --location "http://localhost:8080" -H "Content-Type: application/json" -d "{ \"text\" : \"Hello world\!\" }"
+    curl -X GET --location "http://localhost:8080"
     ```
+- _cf. 애플리케이션 실행이 안될 때_
+    ```shell
+    Description:
+    Parameter 0 of constructor in com.example.demo.MessageService required a bean of type 'org.springframework.jdbc.core.JdbcTemplate' that could not be found.
+
+    Action:
+    Consider defining a bean of type 'org.springframework.jdbc.core.JdbcTemplate' in your configuration.
+    ```
+    - `build.gradle.kts` 파일에서 `implementation("com.h2database:h2")` 종속성 추가
+    - `DemoApplication.kt`
+      파일의 `@SpringBootApplication(exclude = [DataSourceAutoConfiguration::class])` 어노테이션에서 `exclude`
+      인수를 제거
 
 ## Retrieve messages by id
+
+- 애플리케이션 기능을 확장해 ID별로 개별 메시지 검색 가능
+
+1. `MessageService` 클래스에서 새로운 함수 `findMessageById(id: String)`를 추가
+    ```kotlin
+    @Service
+    class MessageService(val db: JdbcTemplate) {
+      
+        fun findMessages(): List<Message> = db.query("select * from messages") { response, _ ->
+            Message(response.getString("id"), response.getString("text"))
+        }
+      
+        fun findMessageById(id: String): List<Message> = db.query("select * from messages where id = ?", id) { response, _ ->
+            Message(response.getString("id"), response.getString("text"))
+        }
+      
+        fun save(message: Message) {
+            val id = message.id ?: UUID.randomUUID().toString()
+            db.update(
+                "insert into messages values ( ?, ? )",
+                id, message.text
+            )
+        }
+    }
+    ```
+    - id로 메시지를 가져오는 데 사용되는 `.query()` 함수는 Spring 프레임워크에서 제공하는 Kotlin 확장 함수.
+    - 이 함수를 사용하려면 `import org.springframework.jdbc.core.query`를 추가로 import 할 수 있음
+
+2. `id` 매개 변수가 있는 `index(...)` 함수를 `MessageController` 클래스에 추가
+    ```kotlin
+    import org.springframework.web.bind.annotation.*
+    
+    @RestController
+    class MessageController(val service: MessageService) {
+        @GetMapping("/")
+        fun index(): List<Message> = service.findMessages()
+    
+        @GetMapping("/{id}")
+        fun index(@PathVariable id: String): List<Message> =
+            service.findMessageById(id)
+    
+        @PostMapping("/")
+        fun post(@RequestBody message: Message) {
+            service.save(message)
+        }
+    }
+    ```
+    - **Retrieving a value from the context path**
+        - 새 함수에 `@GetMapping("/{id}")`으로 주석을 달면, Spring 프레임워크가 컨텍스트 경로에서 message id를 검색
+        - 함수 인수로 `@PathVariable` 어노테이션을 넣으면 프레임워크에서 검색된 값을 함수 인수로 사용하도록 지시
+    - **vararg argument position in the parameter list**
+        - `query()` 함수는 세 개의 인수를 받음
+            - SQL 쿼리 문자열
+            - 문자열 타입 매개변수 `id`
+            - RowMapper 인스턴스(람다 표현식)
+        - `query()` 함수의 두 번째 매개변수는 가변 인수(vararg)로 선언됨
+            - Kotlin에서는 가변 인수 매개변수의 위치가 매개변수 목록의 마지막에 위치할 필요는 없음
+
+---
+
+## Update your application
+
+1. `Message` 클래스에 `@Table` 어노테이션을 추가해 데이터베이스 테이블에 대한 매핑 선언
+    - `id` 필드 앞에 `@id` 어노테이션 추가
+    - 어노테이션을 추가하는 것 외에도, 데이터베이스에 새 객체를 삽입할 때 `CrudRepository`가 작동하는 방식에 따라 `id`를 변경 가능(`var`)으로 만들어야
+      함.
+    ```kotlin
+    import org.springframework.data.annotation.Id
+    import org.springframework.data.relational.core.mapping.Table
+    
+    @Table("MESSAGES")
+    data class Message(@Id var id: String?, val text: String)
+    ```
+
+2. `Message` 데이터 클래스와 함께 작동할 `CrudRepository`의 인터페이스 선언
+    ```kotlin
+    import org.springframework.data.repository.CrudRepository
+    
+    interface MessageRepository : CrudRepository<Message, String>
+    ```
+
+3. `MessageService` 클래스를 업데이트
+    - 이제 SQL 쿼리를 실행하는 대신 `MessageRepository` 호출
+    ```kotlin
+    import java.util.*
+    
+    @Service
+    class MessageService(val db: MessageRepository) {
+        fun findMessages(): List<Message> = db.findAll().toList()
+        
+        fun findMessageById(id: String): List<Message> = db.findById(id).toList() 
+        
+        fun save(message: Message) {
+            db.save(message)
+        }
+   
+        // Optional 클래스에 .toList() 확장 함수 추가
+        fun <T : Any> Optional<out T>.toList(): List<T> =
+            if (isPresent) listOf(get()) else emptyList()
+    }
+    ```
+    - **Extension functions**
+        - `CrudRepository` 인터페이스의 `findById()` 함수의 반환 유형은 `Optional` 클래스의 인스턴스
+        - 그러나 일관성을 위해 단일 메시지가 포함된 List를 반환하는 것이 편리
+        - 그러기 위해서는 `Optional` 값이 있는 경우, 래핑을 해제하고 해당 값이 포함된 리스트를 반환해야 하는데 `Optional` 타입의 확장 함수로 구현 가능
+        - `Optional<out T>.toList()`에서 `.toList()`는 `Optional`의 확장 함수인데, 확장 함수를 사용하면 모든 클래스에 추가 함수를
+          작성할 수 잇으므로 일부 라이브러리 클래스의 기능을 확장하려는 경우에 유용
+    - **CrudRepository `save()` function**
+        - 이 함수는 데이터베이스에 id가 없는 새 객체가 있다는 가정하에 작동하므로 insert 하려면 id가 `null`이어야 함
+        - id가 null이 아닌 경우, CrudReposition는 객체가 데이터베이스에 이미 존재한다고 가정하며, 이는 insert 작업이 아닌 update 작업
+        - insert 작업이 끝나면 데이터 저장소에서 `id`가 생성되어 메시지 인스턴스에 다시 할당됨
+        - 따라서 `id` 속성은 `var` 키워드를 사용해서 선언해야 함
+
+4. 메시지 테이블 정의를 업데이트해 삽입된 객체에 대한 id 생성
+    - id는 문자열이므로 기본적으로 `RANDOM_UUID()` 함수를 사용해 생성할 수 있음
+    ```roomsql
+    CREATE TABLE IF NOT EXISTS messages (
+      id  VARCHAR(60) DEFAULT RANDOM_UUID() PRIMARY KEY,
+      text VARCHAR  NOT NULL
+    )
+    ```
+
+5. `src/main/resources` 폴더의 `application.properties`의 데이터베이스명 변경
+    ```properties
+    spring.datasource.driver-class-name=org.h2.Driver
+    spring.datasource.url=jdbc:h2:file:./data/testdb2
+    spring.datasource.username=name
+    spring.datasource.password=password
+    spring.sql.init.schema-locations=classpath:schema.sql
+    spring.sql.init.mode=always
+    ```
