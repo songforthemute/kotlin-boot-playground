@@ -466,6 +466,9 @@ class MessageService(val db: JdbcTemplate) {
     - `id` 필드 앞에 `@id` 어노테이션 추가
     - 어노테이션을 추가하는 것 외에도, 데이터베이스에 새 객체를 삽입할 때 `CrudRepository`가 작동하는 방식에 따라 `id`를 변경 가능(`var`)으로 만들어야
       함.
+    - _cf. `@Table` 어노테이션을 추가하려면, `import org.springframework.data.relational.core.mapping.Table`
+      패키지를 import 해오면 되는데, 해당 패키지는 `build.gradle.kt`
+      파일에 `implementation 'org.springframework.boot:spring-boot-starter-jdbc'`의존성을 추가하면 됨_
     ```kotlin
     import org.springframework.data.annotation.Id
     import org.springframework.data.relational.core.mapping.Table

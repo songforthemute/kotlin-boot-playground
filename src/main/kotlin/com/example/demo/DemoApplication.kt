@@ -1,9 +1,9 @@
 package com.example.demo
 
-import jakarta.persistence.Table
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.data.annotation.Id
+import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.CrudRepository
 import org.springframework.stereotype.Service
 import org.springframework.web.bind.annotation.*
@@ -28,6 +28,13 @@ class MessageController(val service: MessageService) {
 
     @PostMapping("/")
     fun post(@RequestBody message: Message) {
+        if (message.id === null) {
+            message.id = UUID.randomUUID().toString()
+        }
+
+        println("Requested Message is, ${message.text}")
+        println("Requested Id is, ${message.id}")
+
         service.save(message)
     }
 }
@@ -35,7 +42,7 @@ class MessageController(val service: MessageService) {
 interface MessageRepository : CrudRepository<Message, String>
 
 @Table(name = "MESSAGES")
-data class Message(@Id var id: String?, val text: String)
+data class Message(@Id var id: String? = UUID.randomUUID().toString(), val text: String)
 
 @Service
 class MessageService(val db: MessageRepository) {
