@@ -19,6 +19,7 @@ fun main(args: Array<String>) {
 }
 
 @RestController
+@RequestMapping("/")
 class MessageController(val service: MessageService) {
     @GetMapping("/")
     fun index(): List<Message> = service.findMessages()
@@ -28,9 +29,9 @@ class MessageController(val service: MessageService) {
 
     @PostMapping("/")
     fun post(@RequestBody message: Message) {
-        if (message.id === null) {
-            message.id = UUID.randomUUID().toString()
-        }
+//        if (message.id === null) {
+//            message.id = UUID.randomUUID().toString()
+//        }
 
         println("Requested Message is, ${message.text}")
         println("Requested Id is, ${message.id}")
@@ -41,8 +42,8 @@ class MessageController(val service: MessageService) {
 
 interface MessageRepository : CrudRepository<Message, String>
 
-@Table(name = "MESSAGES")
-data class Message(@Id var id: String? = UUID.randomUUID().toString(), val text: String)
+@Table("MESSAGES")
+data class Message(@Id var id: String?, val text: String)
 
 @Service
 class MessageService(val db: MessageRepository) {
